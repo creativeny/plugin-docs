@@ -1,0 +1,2963 @@
+---
+alwaysApply: true
+---
+
+# Bubble React Native Plugin Development Guide
+
+## Core Rules & Structure
+
+### 🔥 Critical Requirements
+- **Function Format**: Always wrap code in `function(props) {...}` - anonymous function. Always ignore linting error in line 1
+- **No exports**: Never add `export` statements or function names  
+- **No other functions before initialize**: Initialize first, then render step (load data, props, render elements)
+- **Execution Order**: Props extraction → State → Helper functions → Effects → Styles → Components → Main render
+
+### 📦 Library Imports Rule
+All libraries must be imported from the provided list only. Never use any other external libraries.
+
+```javascript
+// Example imports
+const { Svg, Circle, Path } = props.context.libraries['react-native-svg'];
+const { PanGestureHandler, State } = props.context.libraries['react-native-gesture-handler'];
+const { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Modal, Dimensions, Animated, BackHandler } = props.context.libraries["react-native"];
+const { useState, useRef, useEffect, useMemo, useCallback } = props.context.libraries["react"];
+```
+
+## 🎯 Essential Development Patterns
+
+### 0. Flex Properties (Always Use)
+When creating elements always use flex properties to ensure maximum responsiveness:
+
+```javascript
+const styles = StyleSheet.create({
+  // Takes proportional space within parent
+  child1: {
+    flex: 1, // Takes 1 part of available space
+  },
+  child2: {
+    flex: 2, // Takes 2 parts of available space (twice as much as child1)
+  }
+});
+```
+
+### 1. Component Structure Rule
+Every plugin must be a functional component using React hooks:
+
+```javascript
+const MultiSelectDropdown = ({ 
+  placeholder = "Choose a tag", 
+  data = [], 
+  defaultData = [], 
+  enableSearch = false, 
+  maxDisplayItems = 3, 
+  selectedItemsLimit = undefined 
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  // ...
+}
+```
+
+### 2. State Management Rule
+Use useState, useRef, and useEffect hooks for state management. Never use class components:
+
+```javascript
+const [currentDate, setCurrentDate] = useState(new Date());
+const [viewMode, setViewMode] = useState('month');
+const eventPopupAnimation = useRef(new Animated.Value(0)).current;
+```
+
+### 3. Bubble Integration Rule
+Access Bubble properties through props and use publishState/triggerEvent for communication:
+
+```javascript
+const { publishState, triggerEvent } = props.instance;
+publishState("selected_items", selectedItems.map(selected => selected.item));
+triggerEvent("selection_changed");
+```
+
+### 4. Error Handling Rule
+Implement silent error handling with try-catch blocks and never show raw errors to users:
+
+```javascript
+try {
+  props.instance.publishState("selected_event", event.originalData);
+} catch (error) {
+  // Silent error handling
+}
+```
+
+### 5. Performance Rule
+Use useMemo and useCallback for expensive calculations and event handlers:
+
+```javascript
+const WeekView = useMemo(() => {
+  const renderWeek = (date) => {
+    // Complex rendering logic
+  };
+  return renderWeek(currentDate);
+}, [currentDate, events, viewMode, colors, colorAccent]);
+```
+
+### 6. Styling Rule
+Use React Native StyleSheet for all styling, never inline styles:
+
+```javascript
+const styles = StyleSheet.create({
+  placeholderText: {
+    color: '#999',
+    fontSize: 16
+  },
+  container: {
+    minWidth: minElemWidth - border_width_left - border_width_right,
+    minHeight: minElemHeight - border_width_top - border_width_bottom,
+    maxWidth: maxElemWidth - border_width_left - border_width_right,
+    maxHeight: maxElemHeight - border_width_top - border_width_bottom,
+    overflow: 'hidden'
+  }
+});
+```
+
+### 7. Animation Rule
+Use React Native Animated API for all animations:
+
+```javascript
+const popupScale = eventPopupAnimation.interpolate({
+  inputRange: [0, 1],
+  outputRange: [0.8, 1]
+});
+```
+
+### 8. Data Processing Rule
+Process Bubble data sources safely with null checks and retry logic:
+
+```javascript
+const dataSource = data_source.get(0, dataLen);
+if (!isComplexAppType(data_type)) {
+  props.instance.data.dataObjects = dataSource.map((item, index) => ({
+    id: (index + 1).toString(),
+    label: item,
+    item: item
+  }));
+}
+```
+
+### 9. Responsive Design Rule
+Use Dimensions API and percentage-based layouts for responsiveness:
+
+```javascript
+const width = props.bubble?.width || Dimensions.get('window').width;
+const height = props.bubble?.height || Dimensions.get('window').height;
+```
+
+### 10. Event Handling Rule
+Always use TouchableOpacity or PanGestureHandler for touch interactions:
+
+```javascript
+<TouchableOpacity
+  ref={dropdownRef}
+  style={styles.dropdownHeader}
+  onPress={handleDropdownToggle}
+>
+```
+
+### 11. Accessibility Rule
+Include essential accessibility props like accessibilityLabel:
+
+```javascript
+<TouchableOpacity
+  accessibilityLabel="Open dropdown menu"
+  accessibilityRole="button"
+>
+```
+
+### 12. Localization Rule
+Support multiple languages through translation objects:
+
+```javascript
+const translations = {
+  English: {
+    monthNames: ['January', 'February', ...],
+    dayNames: ['Sun', 'Mon', ...]
+  },
+  French: {
+    monthNames: ['Janvier', 'Février', ...],
+    dayNames: ['Dim', 'Lun', ...]
+  }
+};
+```
+
+### 13. Cleanup Rule
+Always clean up effects, timeouts, and subscriptions:
+
+```javascript
+useEffect(() => {
+  const timer = setInterval(() => {...}, 60000);
+  return () => clearInterval(timer);
+}, []);
+```
+
+### 14. Documentation Rule
+Include clear comments explaining complex logic:
+
+```javascript
+// Helper function to check if an event spans multiple days
+const isMultiDayEvent = (event) => {
+  const startDate = new Date(event.start);
+  const endDate = new Date(event.end);
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+  return endDate.getTime() > startDate.getTime();
+};
+```
+
+### 15. Prop Validation Rule
+Validate all props with default values and type checking:
+
+```javascript
+const {
+  placeholder,
+  data_type,
+  data_source,
+  data_id_field,
+  data_label_field,
+  default_data,
+  enable_search,
+  max_displayed_items,
+  max_options_list_height,
+  selected_items_color,
+  max_selected_items
+} = props;
+```
+
+### 16. Preview Mode Rule
+Implement preview functionality for Bubble editor:
+
+```javascript
+let calendarHTML = `
+  <div style="
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: ${colors.background};
+  ">...</div>`;
+$(instance.canvas).empty().append(calendarHTML);
+```
+
+### 17. Component Structure Rule
+Component code must be wrapped within function(props) {...}. Never add function name, it must be anonymous. Do not add code.export and anything of that nature. It must always follow this exact structure function(props) {...}
+
+## 📋 Complete Code Samples
+
+### 🎯 DROPDOWN COMPONENT
+
+#### Component Code
+```javascript
+function(props) {
+  // Multi Dropdown Native -> (component) Multi Dropdown
+  const {
+    View,
+    Text,
+    TouchableOpacity,
+    ScrollView,
+    TextInput,
+    StyleSheet,
+    Modal,
+    Dimensions
+  } = props.context.libraries["react-native"];
+  const {
+    useState,
+    useRef,
+    useEffect
+  } = props.context.libraries["react"];
+  const {
+    reportDebugger
+  } = props.context;
+  const {
+    publishState,
+    triggerEvent
+  } = props.instance;
+  const {
+    placeholder,
+    data_type,
+    data_source,
+    data_id_field,
+    data_label_field,
+    default_data,
+    enable_search,
+    max_displayed_items,
+    max_options_list_height,
+    selected_items_color,
+    max_selected_items
+  } = props;
+  const {
+    width,
+    border_width_left,
+    border_width_right,
+    height,
+    border_width_top,
+    border_width_bottom
+  } = props.bubble;
+  const minElemHeight = parseInt(props.bubble.min_height_css);
+  const minElemWidth = parseInt(props.bubble.min_width_css);
+  const maxElemHeight = parseInt(props.bubble.max_height_css);
+  const maxElemWidth = parseInt(props.bubble.max_width_css);
+
+  // Skip plugin execution while data_type is not set
+  if (!data_type) return null;
+
+  // Skip plugin execution if the data_source is not set
+  const dataLen = data_source?.length();
+  if (!dataLen) {
+    return null;
+  }
+
+  // Function to determine if the data type is complex
+  function isComplexAppType(appType) {
+    return appType === 'user' || appType.includes('custom') || appType.includes('api.apiconnector2') || appType.match(/api\..*\.plugin_api/) !== null;
+  }
+
+  // Process data source based on data type
+  const dataSource = data_source.get(0, dataLen);
+  if (!isComplexAppType(data_type)) {
+    // Simple data types
+    props.instance.data.dataObjects = dataSource.map((item, index) => ({
+      id: (index + 1).toString(),
+      label: item,
+      item: item // Store the full item for later use
+    }));
+  } else {
+    // Complex data types
+    if (!data_label_field) {
+      reportDebugger("Please set 'Data label field' for complex data types.");
+      return null;
+    }
+    if (!data_id_field) {
+      // Data without ID field
+      props.instance.data.dataObjects = dataSource.map((item, index) => ({
+        id: (index + 1).toString(),
+        label: item.get(data_label_field),
+        item: item // Store the full item for later use
+      }));
+    } else {
+      // Data with ID field
+      props.instance.data.dataObjects = dataSource.map((item, index) => ({
+        id: item.get(data_id_field).toString(),
+        label: item.get(data_label_field),
+        item: item // Store the full item for later use
+      }));
+    }
+  }
+
+  // Process default data based on data type
+  const defaultDataLen = default_data?.length() || 0;
+  const defaultDataSource = default_data?.get(0, defaultDataLen);
+  props.instance.data.defaultData = [];
+  if (defaultDataLen) {
+    if (!isComplexAppType(data_type)) {
+      // Simple data types
+      defaultDataSource.forEach(item => {
+        // Find matching item in dataObjects by label
+        const matchingDataObject = props.instance.data.dataObjects.find(dataObj => dataObj.label === item);
+        if (matchingDataObject) {
+          props.instance.data.defaultData.push({
+            ...matchingDataObject
+          });
+        }
+      });
+    } else {
+      // Complex data types
+      defaultDataSource.forEach(item => {
+        let matchingDataObject;
+        if (!data_id_field) {
+          // Data without ID field - match by label
+          const defaultLabel = item.get(data_label_field);
+          matchingDataObject = props.instance.data.dataObjects.find(dataObj => dataObj.label === defaultLabel);
+        } else {
+          // Data with ID field - match by ID
+          const defaultId = item.get(data_id_field).toString();
+          const defaultLabel = item.get(data_label_field);
+          matchingDataObject = props.instance.data.dataObjects.find(dataObj => dataObj.id === defaultId && dataObj.label === defaultLabel);
+        }
+        if (matchingDataObject) {
+          props.instance.data.defaultData.push({
+            id: matchingDataObject.id,
+            label: matchingDataObject.label,
+            item: matchingDataObject.item
+          });
+        }
+      });
+    }
+  }
+
+  // Compare 2 arrays
+  function areArraysEqual(arr1, arr2) {
+    if (!Array.isArray(arr1) || !Array.isArray(arr2)) return false;
+    if (arr1.length !== arr2.length) return false;
+    const arr1String = JSON.stringify(arr1);
+    const arr2String = JSON.stringify(arr2);
+    if (arr1String !== arr2String) return false;
+    return true;
+  }
+
+  // Detect "update" function call by Bubble
+  if (areArraysEqual(props.instance.data.dataObjects, props.instance.data.previousDataObjects)) {
+    // Changes from Bubble
+  } else {
+    // Initial load or data change by user
+    props.instance.data.previousDataObjects = [...props.instance.data.dataObjects];
+    props.instance.data.selectedItems = [...props.instance.data.defaultData];
+  }
+
+  const styles = StyleSheet.create({
+    placeholderText: {
+      color: '#999',
+      fontSize: 16
+    },
+    container: {
+      minWidth: minElemWidth - border_width_left - border_width_right,
+      minHeight: minElemHeight - border_width_top - border_width_bottom,
+      maxWidth: maxElemWidth - border_width_left - border_width_right,
+      maxHeight: maxElemHeight - border_width_top - border_width_bottom,
+      overflow: 'hidden'
+    },
+    dropdownHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: '#e8e8e8',
+      paddingHorizontal: 15,
+      paddingVertical: 12,
+      minHeight: 60 - border_width_top - border_width_bottom
+    },
+    selectedContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      flexWrap: 'wrap'
+    },
+    selectedTag: {
+      backgroundColor: selected_items_color,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginRight: 8,
+      marginVertical: 2
+    },
+    selectedTagText: {
+      color: 'white',
+      fontSize: 14,
+      fontWeight: '500'
+    },
+    remainingTag: {
+      backgroundColor: selected_items_color,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8
+    },
+    remainingTagText: {
+      color: 'white',
+      fontSize: 14,
+      fontWeight: '600'
+    },
+    arrow: {
+      fontSize: 12,
+      color: '#666',
+      marginLeft: 10
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'transparent'
+    },
+    dropdownContent: {
+      position: 'absolute',
+      backgroundColor: 'white',
+      borderRadius: 8,
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 4
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 10,
+      maxHeight: max_options_list_height || 300,
+      borderWidth: 1,
+      borderColor: '#e0e0e0'
+    },
+    searchContainer: {
+      padding: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0'
+    },
+    searchInput: {
+      fontSize: 16,
+      paddingVertical: 8,
+      paddingHorizontal: 0,
+      color: '#333'
+    },
+    itemsList: {
+      maxHeight: enable_search ? max_options_list_height - 80 || 200 : max_options_list_height || 200
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 15,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f8f8f8'
+    },
+    selectedItem: {
+      backgroundColor: '#fce4ec'
+    },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: '#e8e8e8',
+      marginRight: 12,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    checkboxInner: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: 'transparent'
+    },
+    checkboxSelected: {
+      backgroundColor: selected_items_color
+    },
+    itemText: {
+      fontSize: 16,
+      color: '#333',
+      flex: 1
+    },
+    selectedItemText: {
+      color: selected_items_color,
+      fontWeight: '500'
+    }
+  });
+
+  const MultiSelectDropdown = ({
+    placeholder = "Choose a tag",
+    data = [],
+    defaultData = [],
+    enableSearch = false,
+    maxDisplayItems = 3,
+    selectedItemsLimit = undefined
+  }) => {
+    // Limit the defaultData to the selectedItemsLimit
+    if (selectedItemsLimit !== undefined && defaultData.length > selectedItemsLimit) {
+      defaultData = defaultData.slice(0, selectedItemsLimit);
+    }
+    const [isOpen, setIsOpen] = useState(false);
+    const [selectedItems, setSelectedItems] = useState(defaultData);
+    const [searchText, setSearchText] = useState('');
+    const [dropdownLayout, setDropdownLayout] = useState({
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      showAbove: false
+    });
+    const dropdownRef = useRef(null);
+    
+    useEffect(() => {
+      publishState("selected_items", selectedItems.map(selected => selected.item));
+      triggerEvent("selection_changed");
+    }, [selectedItems]);
+    
+    props.instance.data.resetSelection = function () {
+      setSelectedItems([]);
+      props.instance.data.selectedItems = [];
+      publishState("selected_items", []);
+      triggerEvent("selection_changed");
+    };
+    
+    const filteredData = data.filter(item => item?.label && item.label.toLowerCase().includes(searchText.toLowerCase()));
+    
+    const handleItemPress = item => {
+      let newSelectedItems;
+      if (selectedItems.find(selected => selected.id === item.id)) {
+        newSelectedItems = selectedItems.filter(selected => selected.id !== item.id);
+      } else {
+        if (selectedItemsLimit === undefined || selectedItems.length < selectedItemsLimit) {
+          newSelectedItems = [...selectedItems, item];
+        } else {
+          triggerEvent("limit_reached");
+          return;
+        }
+      }
+      setSelectedItems(newSelectedItems);
+      props.instance.data.selectedItems = [...newSelectedItems];
+    };
+    
+    const handleDropdownToggle = () => {
+      if (!isOpen && dropdownRef.current) {
+        dropdownRef.current.measureInWindow((x, y, width, height) => {
+          const screenHeight = Dimensions.get('window').height;
+          const dropdownHeight = Math.min(300, filteredData.length * 50 + 80);
+
+          const spaceBelow = screenHeight - (y + height);
+          const spaceAbove = y;
+
+          const showAbove = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+          setDropdownLayout({
+            x,
+            y: showAbove ? y - dropdownHeight + 17 : y + height + 5,
+            width,
+            height,
+            showAbove
+          });
+          setIsOpen(true);
+        });
+      } else {
+        setIsOpen(false);
+      }
+    };
+    
+    const renderSelectedTags = () => {
+      if (selectedItems.length === 0) return null;
+      const displayItems = selectedItems.slice(0, maxDisplayItems);
+      const remainingCount = selectedItems.length - maxDisplayItems;
+      return /*#__PURE__*/React.createElement(View, {
+        style: styles.selectedContainer
+      }, displayItems.map(item => /*#__PURE__*/React.createElement(View, {
+        key: item.id,
+        style: styles.selectedTag
+      }, /*#__PURE__*/React.createElement(Text, {
+        style: styles.selectedTagText
+      }, item.label))), remainingCount > 0 && /*#__PURE__*/React.createElement(View, {
+        style: styles.remainingTag
+      }, /*#__PURE__*/React.createElement(Text, {
+        style: styles.remainingTagText
+      }, remainingCount)));
+    };
+    
+    const renderDropdownHeader = () => /*#__PURE__*/React.createElement(TouchableOpacity, {
+      ref: dropdownRef,
+      style: styles.dropdownHeader,
+      onPress: handleDropdownToggle
+    }, selectedItems.length === 0 ? /*#__PURE__*/React.createElement(Text, {
+      style: styles.placeholderText
+    }, placeholder) : renderSelectedTags(), /*#__PURE__*/React.createElement(Text, {
+      style: [styles.arrow, {
+        transform: [{
+          rotate: isOpen ? '180deg' : '0deg'
+        }]
+      }]
+    }, "\u25BC"));
+    
+    const renderDropdownItem = item => {
+      const isSelected = selectedItems.find(selected => selected.id === item.id);
+      return /*#__PURE__*/React.createElement(TouchableOpacity, {
+        key: item.id,
+        style: [styles.dropdownItem, isSelected && styles.selectedItem],
+        onPress: () => handleItemPress(item)
+      }, /*#__PURE__*/React.createElement(View, {
+        style: styles.checkbox
+      }, /*#__PURE__*/React.createElement(View, {
+        style: [styles.checkboxInner, isSelected && styles.checkboxSelected]
+      })), /*#__PURE__*/React.createElement(Text, {
+        style: [styles.itemText, isSelected && styles.selectedItemText]
+      }, item.label));
+    };
+    
+    return /*#__PURE__*/React.createElement(View, {
+      style: styles.container
+    }, renderDropdownHeader(), /*#__PURE__*/React.createElement(Modal, {
+      visible: isOpen,
+      transparent: true,
+      animationType: "fade",
+      onRequestClose: () => setIsOpen(false)
+    }, /*#__PURE__*/React.createElement(TouchableOpacity, {
+      style: styles.modalOverlay,
+      activeOpacity: 1,
+      onPress: () => setIsOpen(false)
+    }, /*#__PURE__*/React.createElement(View, {
+      style: [styles.dropdownContent, {
+        left: dropdownLayout.x,
+        top: dropdownLayout.y,
+        width: dropdownLayout.width
+      }]
+    }, /*#__PURE__*/React.createElement(TouchableOpacity, {
+      activeOpacity: 1,
+      onPress: () => {}
+    }, enableSearch && /*#__PURE__*/React.createElement(View, {
+      style: styles.searchContainer
+    }, /*#__PURE__*/React.createElement(TextInput, {
+      style: styles.searchInput,
+      placeholder: "Search",
+      value: searchText,
+      onChangeText: setSearchText
+    })), /*#__PURE__*/React.createElement(ScrollView, {
+      style: styles.itemsList,
+      showsVerticalScrollIndicator: false
+    }, filteredData.map(item => renderDropdownItem(item))))))));
+  };
+
+  return /*#__PURE__*/React.createElement(MultiSelectDropdown, {
+    placeholder: placeholder,
+    maxDisplayItems: Math.min(Math.max(1, max_displayed_items), Infinity),
+    data: props.instance.data.dataObjects,
+    defaultData: props.instance.data.selectedItems,
+    enableSearch: enable_search,
+    selectedItemsLimit: max_selected_items ? Math.min(Math.max(1, max_selected_items), Infinity) : undefined
+  });
+}
+```
+
+#### Action Code
+```javascript
+function(instance, properties, context) {
+  // Multi Dropdown Native -> (component) Multi Dropdown -> Reset
+  const { resetSelection } = instance.data;
+
+  if (resetSelection) {
+    // Reset the selection of the multi dropdown
+    resetSelection();
+  }
+}
+```
+
+#### Preview Code
+```javascript
+function(instance, properties) {
+  // Default properties with fallbacks
+  const colorMode = properties.color_mode || 'Dark';
+  const colorAccent = properties.color_accent || '#3b82f6';
+  const language = properties.language || 'English';
+  
+  // Color scheme based on mode
+  const colors = colorMode === 'Light' ? {
+    background: '#ffffff',
+    surface: '#f8fafc',
+    border: '#e2e8f0',
+    text: '#1e293b',
+    textSecondary: '#64748b'
+  } : {
+    background: '#111827',
+    surface: '#1f2937',
+    border: '#374151',
+    text: '#ffffff',
+    textSecondary: '#d1d5db'
+  };
+
+  // Sample events data
+  const events = [
+    {
+      title: 'Meeting with Client',
+      start: new Date(2025, 5, 18, 10, 0), // June 18, 2025 10:00 AM
+      end: new Date(2025, 5, 18, 11, 30),  // June 18, 2025 11:30 AM
+      color: '#22c55e'
+    },
+    {
+      title: 'Conference',
+      start: new Date(2025, 5, 18, 9, 0),  // June 18, 2025 09:00 AM
+      end: new Date(2025, 5, 19, 17, 0),   // June 19, 2025 5:00 PM
+      color: '#8b5cf6'
+    },
+    {
+      title: 'Meetup',
+      start: new Date(2025, 5, 18),        // June 18, 2025
+      end: new Date(2025, 5, 18),          // June 18, 2025
+      color: '#06b6d4',
+      allDay: true
+    },
+    {
+      title: 'Launch',
+      start: new Date(2025, 5, 20, 14, 0), // June 20, 2025 2:00 PM
+      end: new Date(2025, 5, 20, 16, 0),   // June 20, 2025 4:00 PM
+      color: '#ef4444'
+    }
+  ];
+
+  // Helper function to format time
+  const formatTime = (date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  };
+
+  // Translation system
+  const translations = {
+    English: {
+      monthNames: [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ],
+      dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    },
+    French: {
+      monthNames: [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      ],
+      dayNames: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+    },
+    Spanish: {
+      monthNames: [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ],
+      dayNames: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+    }
+  };
+
+  // Get current language translations with fallback to English
+  const t = translations[language] || translations.English;
+
+  // Generate calendar grid HTML
+  let calendarHTML = `
+    <div style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: ${colors.background};
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: 'Mulish', sans-serif;
+    ">
+      <!-- Header -->
+      <div style="
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      ">
+        <div style="
+          color: ${colors.text};
+          font-size: 16px;
+          font-weight: 600;
+        ">${t.monthNames[5]} 2025</div>
+        <div style="display: flex; gap: 8px;">
+          <div style="
+            padding: 4px 12px;
+            background: ${colorAccent};
+            border-radius: 6px;
+            color: ${colors.text};
+            font-size: 14px;
+          ">M</div>
+        </div>
+      </div>
+
+      <!-- Days header -->
+      <div style="
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        padding: 8px 0;
+        background: ${colors.surface};
+        flex-shrink: 0;
+      ">
+        ${t.dayNames.map(day => `
+          <div style="
+            color: ${colors.textSecondary};
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+          ">${day}</div>
+        `).join('')}
+      </div>
+
+      <!-- Calendar grid -->
+      <div style="
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        grid-template-rows: repeat(6, 1fr);
+        background: ${colors.background};
+        min-height: 0;
+      ">
+        ${Array.from({ length: 42 }, (_, i) => {
+          const date = i + 1;
+          const hasEvents = date === 18 || date === 19 || date === 20;
+          const dayEvents = events.filter(event => event.start.getDate() === date);
+          
+          return `
+            <div style="
+              background: ${colors.background};
+              border-top: 1px solid ${colors.border};
+              border-left: ${i % 7 === 0 ? '0' : `1px solid ${colors.border}`};
+              padding: 4px;
+              display: flex;
+              flex-direction: column;
+              gap: 2px;
+              min-width: 0;
+              min-height: 0;
+              overflow: hidden;
+            ">
+              <div style="
+                color: ${colors.text};
+                font-size: 14px;
+                text-align: center;
+                padding: 2px;
+                ${date === 18 ? `font-weight: bold; color: ${colorAccent};` : ''}
+              ">${date}</div>
+              ${dayEvents.map(event => `
+                <div style="
+                  background: ${event.color};
+                  border-radius: 4px;
+                  padding: 2px 4px;
+                  margin: 1px 0;
+                  overflow: hidden;
+                  ${event.allDay ? 'border-left: 3px solid #ffffff;' : ''}
+                ">
+                  <div style="
+                    color: #ffffff;
+                    font-size: 10px;
+                    font-weight: 500;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                  ">${event.title}</div>
+                  ${!event.allDay ? `
+                    <div style="
+                      color: #ffffff;
+                      font-size: 9px;
+                      opacity: 0.9;
+                    ">${formatTime(event.start)}</div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
+  // Clear the instance canvas before appending
+  $(instance.canvas).empty().append(calendarHTML);
+}
+```
+
+### 📅 CALENDAR COMPONENT
+
+#### Component Code
+```javascript
+function(props) {
+  // Access React and React Native from context
+  const React = props.context?.libraries?.['react'];
+  if (!React) return null;
+
+  const { useState, useEffect, useMemo, useRef, useCallback } = React;
+  const { View, Text, TouchableOpacity, ScrollView, Dimensions, Animated, BackHandler } = props.context.libraries['react-native'];
+  const { Svg, Circle, Path } = props.context.libraries['react-native-svg'];
+  const { PanGestureHandler, State } = props.context.libraries['react-native-gesture-handler'];
+
+  // Generate unique instance ID
+  let instanceId = (Math.random() * Math.pow(2, 54)).toString(36);
+  props.instance.data.instanceName = 'calendar-' + instanceId;
+
+  // Register this calendar instance globally for jump-to functionality
+  if (typeof global !== 'undefined') {
+    if (!global.calendarInstances) {
+      global.calendarInstances = {};
+    }
+    global.calendarInstances[instanceId] = {};
+  }
+
+  // Define all props at the beginning
+  const dataSource = props.data_source;
+  const titleField = props.title || 'title';
+  const dateStartField = props.date_start || 'date_start';
+  const dateEndField = props.date_end || 'date_end';
+  const allDayField = props.all_day || 'all_day';
+  const colorEvent = props.color_event || '';
+  const colorAccent = props.color_accent || '#3b82f6';
+  const colorMode = props.color_mode || 'Dark';
+  const language = props.language || 'English';
+
+  // Translation system
+  const translations = {
+    English: {
+      monthNames: [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ],
+      dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      dayNamesFull: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      allDay: 'All Day',
+      loading: 'Loading...',
+      month: 'M',
+      week: 'W',
+      day: 'D',
+      am: 'AM',
+      pm: 'PM'
+    },
+    French: {
+      monthNames: [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      ],
+      dayNames: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
+      dayNamesFull: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
+      allDay: 'Toute la journée',
+      loading: 'Chargement...',
+      month: 'M',
+      week: 'S',
+      day: 'J',
+      am: 'AM',
+      pm: 'PM'
+    },
+    Spanish: {
+      monthNames: [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ],
+      dayNames: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+      dayNamesFull: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+      allDay: 'Todo el día',
+      loading: 'Cargando...',
+      month: 'M',
+      week: 'S',
+      day: 'D',
+      am: 'AM',
+      pm: 'PM'
+    }
+  };
+
+  // Get current language translations
+  const t = translations[language] || translations.English;
+
+  // Get responsive dimensions
+  const width = props.bubble?.width || Dimensions.get('window').width;
+  const height = props.bubble?.height || Dimensions.get('window').height;
+
+  // Calendar state
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState('month'); // 'month', 'week', 'day'
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [showMonthSelector, setShowMonthSelector] = useState(false);
+  const [showYearSelector, setShowYearSelector] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [forceRenderCount, setForceRenderCount] = useState(0);
+  const [isReactNativeInitialized, setIsReactNativeInitialized] = useState(false);
+  const eventPopupAnimation = useRef(new Animated.Value(0)).current;
+  
+  // Animation values
+  const swipeAnimation = useRef(new Animated.Value(0)).current;
+
+  // [Rest of the calendar component code continues with all the functions and components...]
+  
+  return React.createElement(View, {
+    style: {
+      width: width,
+      height: height,
+      backgroundColor: colors.background,
+      fontFamily: 'inherit',
+      fontWeight: 'inherit',
+      color: 'inherit'
+    }
+  }, [
+    React.createElement(Header, { key: 'header' }),
+    React.createElement(MonthSelector, { key: 'month-selector' }),
+    React.createElement(YearSelector, { key: 'year-selector' }),
+    renderCurrentView(),
+    React.createElement(FloatingActionButton, { key: 'fab' }),
+    React.createElement(EventPopup, { key: 'event-popup' })
+  ]);
+}
+```
+
+#### Action Code
+```javascript
+function(instance, properties, context) {
+    // Extract date property - can be Date object, string, or timestamp
+    const targetDate = properties.date || properties.target_date || new Date();
+    
+    // Convert to proper Date object if needed
+    let dateToJump;
+    try {
+        if (targetDate instanceof Date) {
+            dateToJump = new Date(targetDate);
+        } else if (typeof targetDate === 'string' || typeof targetDate === 'number') {
+            dateToJump = new Date(targetDate);
+        } else {
+            dateToJump = new Date(); // fallback to today
+        }
+        
+        // Validate the date
+        if (isNaN(dateToJump.getTime())) {
+            dateToJump = new Date(); // fallback to today
+        }
+        
+        // Format date for display
+        const formattedDate = dateToJump.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        
+        // Try to use instance methods first
+        try {
+            if (instance?.data?.jumpToDate) {
+                instance.data.jumpToDate(dateToJump);
+            } else if (instance?.data?.jumpTo) {
+                instance.data.jumpTo(dateToJump);
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+        
+    } catch (error) {
+        // Silent error handling
+    }
+}
+```
+
+#### Preview Code
+```javascript
+function(instance, properties) {
+  // Default properties with fallbacks
+  const colorMode = properties.color_mode || 'Dark';
+  const colorAccent = properties.color_accent || '#3b82f6';
+  const language = properties.language || 'English';
+  
+  // Color scheme based on mode
+  const colors = colorMode === 'Light' ? {
+    background: '#ffffff',
+    surface: '#f8fafc',
+    border: '#e2e8f0',
+    text: '#1e293b',
+    textSecondary: '#64748b'
+  } : {
+    background: '#111827',
+    surface: '#1f2937',
+    border: '#374151',
+    text: '#ffffff',
+    textSecondary: '#d1d5db'
+  };
+
+  // Sample events data
+  const events = [
+    {
+      title: 'Meeting with Client',
+      start: new Date(2025, 5, 18, 10, 0),
+      end: new Date(2025, 5, 18, 11, 30),
+      color: '#22c55e'
+    },
+    {
+      title: 'Conference',
+      start: new Date(2025, 5, 18, 9, 0),
+      end: new Date(2025, 5, 19, 17, 0),
+      color: '#8b5cf6'
+    },
+    {
+      title: 'Meetup',
+      start: new Date(2025, 5, 18),
+      end: new Date(2025, 5, 18),
+      color: '#06b6d4',
+      allDay: true
+    },
+    {
+      title: 'Launch',
+      start: new Date(2025, 5, 20, 14, 0),
+      end: new Date(2025, 5, 20, 16, 0),
+      color: '#ef4444'
+    }
+  ];
+
+  // Helper function to format time
+  const formatTime = (date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  };
+
+  // Translation system
+  const translations = {
+    English: {
+      monthNames: [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ],
+      dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    },
+    French: {
+      monthNames: [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      ],
+      dayNames: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+    },
+    Spanish: {
+      monthNames: [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ],
+      dayNames: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+    }
+  };
+
+  // Get current language translations with fallback to English
+  const t = translations[language] || translations.English;
+
+  // Generate calendar grid HTML
+  let calendarHTML = `
+    <div style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: ${colors.background};
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: 'Mulish', sans-serif;
+    ">
+      <!-- Header -->
+      <div style="
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      ">
+        <div style="
+          color: ${colors.text};
+          font-size: 16px;
+          font-weight: 600;
+        ">${t.monthNames[5]} 2025</div>
+        <div style="display: flex; gap: 8px;">
+          <div style="
+            padding: 4px 12px;
+            background: ${colorAccent};
+            border-radius: 6px;
+            color: ${colors.text};
+            font-size: 14px;
+          ">M</div>
+        </div>
+      </div>
+
+      <!-- Days header -->
+      <div style="
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        padding: 8px 0;
+        background: ${colors.surface};
+        flex-shrink: 0;
+      ">
+        ${t.dayNames.map(day => `
+          <div style="
+            color: ${colors.textSecondary};
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+          ">${day}</div>
+        `).join('')}
+      </div>
+
+      <!-- Calendar grid -->
+      <div style="
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        grid-template-rows: repeat(6, 1fr);
+        background: ${colors.background};
+        min-height: 0;
+      ">
+        ${Array.from({ length: 42 }, (_, i) => {
+          const date = i + 1;
+          const dayEvents = events.filter(event => event.start.getDate() === date);
+          
+          return `
+            <div style="
+              background: ${colors.background};
+              border-top: 1px solid ${colors.border};
+              border-left: ${i % 7 === 0 ? '0' : `1px solid ${colors.border}`};
+              padding: 4px;
+              display: flex;
+              flex-direction: column;
+              gap: 2px;
+              min-width: 0;
+              min-height: 0;
+              overflow: hidden;
+            ">
+              <div style="
+                color: ${colors.text};
+                font-size: 14px;
+                text-align: center;
+                padding: 2px;
+                ${date === 18 ? `font-weight: bold; color: ${colorAccent};` : ''}
+              ">${date}</div>
+              ${dayEvents.map(event => `
+                <div style="
+                  background: ${event.color};
+                  border-radius: 4px;
+                  padding: 2px 4px;
+                  margin: 1px 0;
+                  overflow: hidden;
+                  ${event.allDay ? 'border-left: 3px solid #ffffff;' : ''}
+                ">
+                  <div style="
+                    color: #ffffff;
+                    font-size: 10px;
+                    font-weight: 500;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                  ">${event.title}</div>
+                  ${!event.allDay ? `
+                    <div style="
+                      color: #ffffff;
+                      font-size: 9px;
+                      opacity: 0.9;
+                    ">${formatTime(event.start)}</div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
+  // Clear the instance canvas before appending
+  $(instance.canvas).empty().append(calendarHTML);
+}
+```
+
+## 📚 Complete Available Libraries
+
+```javascript
+{
+    "@bbob/preset-react": "^4.2.0",
+    "@bbob/react": "^4.2.0",
+    "@expo/metro-runtime": "~4.0.1",
+    "@gorhom/bottom-sheet": "^5.1.2",
+    "@gorhom/portal": "^1.0.14",
+    "@microsoft/react-native-clarity": "^4.2.2",
+    "@react-native-community/audio-toolkit": "^2.0.3",
+    "@react-native-community/datetimepicker": "^8.2.0",
+    "@react-native-community/netinfo": "11.4.1",
+    "@react-navigation/bottom-tabs": "^7.2.0",
+    "@react-navigation/elements": "^2.2.5",
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/native-stack": "^7.2.0",
+    "@sentry/react-native": "^6.10.0",
+    "@shopify/flash-list": "1.7.3",
+    "expo": "~52.0.42",
+    "expo-asset": "^11.0.4",
+    "expo-auth-session": "~6.0.2",
+    "expo-blur": "~14.0.3",
+    "expo-clipboard": "~7.0.1",
+    "expo-constants": "^17.0.7",
+    "expo-crypto": "~14.0.2",
+    "expo-document-picker": "~13.0.3",
+    "expo-image": "~2.0.7",
+    "expo-image-picker": "^16.0.6",
+    "expo-linear-gradient": "~14.0.2",
+    "expo-location": "~18.0.9",
+    "expo-media-library": "^17.0.6",
+    "expo-notifications": "~0.29.14",
+    "expo-secure-store": "~14.0.1",
+    "expo-splash-screen": "^0.29.22",
+    "expo-status-bar": "~2.0.1",
+    "expo-updates": "~0.27.4",
+    "expo-video": "~2.0.6",
+    "fast-text-encoding": "^1.0.6",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native": "~0.77.1",
+    "react-native-fs": "^2.20.0",
+    "react-native-gesture-handler": "~2.22.0",
+    "react-native-localize": "^3.4.1",
+    "react-native-maps": "1.18.0",
+    "react-native-mmkv": "^2.12.2",
+    "react-native-modal-datetime-picker": "^18.0.0",
+    "react-native-reanimated": "~3.17.5",
+    "react-native-redash": "^18.1.1",
+    "react-native-safe-area-context": "~5.1.0",
+    "react-native-screens": "~4.8.0",
+    "react-native-svg": "^15.11.2",
+    "react-native-web": "~0.19.13",
+    "react-native-webview": "~13.13.1"
+}
+```
+
+### Other Available Libraries
+- expo-video
+- react-native-community/audio-toolkit
+- @microsoft/react-native-clarity
+- expo-clipboard
+- expo-document-picker
+
+## 🖼️ Small Display Icon Template
+
+```javascript
+function(instance, properties) {
+    $(instance.canvas).append(`<div style="background-color: #E7E9EB; margin: 0; padding: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;"><img src="👇🏽" style="width: 20px; height: 20px; margin: 0; padding: 0;"></div>`)
+}
+```
+
+## 📄 Plugin Description Template
+
+Must be concise, no subpoints, related emoji before every point, marketable tone, must contain "native mobile", and include placeholders:
+
+```
+Converts timestamps into human-readable relative time formats with full language customization. For native mobile.
+
+Features
+
+🕐 Real-time updates - Automatically refreshes at configurable intervals.
+  
+🌍 Multi-language support - Fully customizable text for any language.
+  
+📊 Smart time ranges - Shows seconds, minutes, hours, yesterday, last [day], or dates. 
+ 
+🔢 Intelligent pluralization - Automatically handles singular/plural forms.
+ 
+🎛️ Flexible suffix control - Toggle "ago" suffix on/off.
+
+Preview:
+
+Editor:
+
+Service link:
+```
+
+## ✅ Development Checklist
+
+### Structure Requirements
+- [ ] Anonymous function wrapper `function(props) {...}`
+- [ ] Props extraction → State → Helper functions → Effects → Styles → Components → Main render
+- [ ] Library imports from context only
+- [ ] No external dependencies
+
+### Responsiveness Requirements  
+- [ ] Flex properties used everywhere
+- [ ] Dimensions API for screen size
+- [ ] Percentage-based layouts
+- [ ] Min/max width/height handling from props.bubble
+
+### Performance Requirements
+- [ ] useMemo for expensive calculations
+- [ ] useCallback for event handlers
+- [ ] Silent error handling with try-catch
+- [ ] Cleanup in useEffect
+
+### Bubble Integration Requirements
+- [ ] publishState for state changes
+- [ ] triggerEvent for user interactions
+- [ ] Access props through props parameter
+- [ ] Handle instance.data for component methods
+
+### Styling Requirements
+- [ ] StyleSheet.create (never inline)
+- [ ] Color scheme support
+- [ ] Border width handling from props.bubble
+- [ ] Consistent spacing and typography
+
+### Data Handling Requirements
+- [ ] Null checks and validation
+- [ ] Retry logic for data loading
+- [ ] Complex vs simple data type handling
+- [ ] Default values for all props
+
+### Accessibility Requirements
+- [ ] accessibilityLabel on interactive elements
+- [ ] accessibilityRole specified
+- [ ] Proper touch targets (minimum 44px)
+
+This comprehensive guide now includes ALL the details from the original document, properly organized and structured for easy reference during Bubble React Native plugin development.# Bubble React Native Plugin Development Guide
+
+## Core Rules & Structure
+
+### 🔥 Critical Requirements
+- **Function Format**: Always wrap code in `function(props) {...}` - anonymous function only
+- **No exports**: Never add `export` statements or function names  
+- **No other functions before initialize**: Initialize first, then render step (load data, props, render elements)
+- **Execution Order**: Props extraction → State → Helper functions → Effects → Styles → Components → Main render
+
+### 📦 Library Imports Rule
+All libraries must be imported from the provided list only. Never use any other external libraries.
+
+```javascript
+// Example imports
+const { Svg, Circle, Path } = props.context.libraries['react-native-svg'];
+const { PanGestureHandler, State } = props.context.libraries['react-native-gesture-handler'];
+const { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Modal, Dimensions, Animated, BackHandler } = props.context.libraries["react-native"];
+const { useState, useRef, useEffect, useMemo, useCallback } = props.context.libraries["react"];
+```
+
+## 🎯 Essential Development Patterns
+
+### 0. Flex Properties (Always Use)
+When creating elements always use flex properties to ensure maximum responsiveness:
+
+```javascript
+const styles = StyleSheet.create({
+  // Takes proportional space within parent
+  child1: {
+    flex: 1, // Takes 1 part of available space
+  },
+  child2: {
+    flex: 2, // Takes 2 parts of available space (twice as much as child1)
+  }
+});
+```
+
+### 1. Component Structure Rule
+Every plugin must be a functional component using React hooks:
+
+```javascript
+const MultiSelectDropdown = ({ 
+  placeholder = "Choose a tag", 
+  data = [], 
+  defaultData = [], 
+  enableSearch = false, 
+  maxDisplayItems = 3, 
+  selectedItemsLimit = undefined 
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  // ...
+}
+```
+
+### 2. State Management Rule
+Use useState, useRef, and useEffect hooks for state management. Never use class components:
+
+```javascript
+const [currentDate, setCurrentDate] = useState(new Date());
+const [viewMode, setViewMode] = useState('month');
+const eventPopupAnimation = useRef(new Animated.Value(0)).current;
+```
+
+### 3. Bubble Integration Rule
+Access Bubble properties through props and use publishState/triggerEvent for communication:
+
+```javascript
+const { publishState, triggerEvent } = props.instance;
+publishState("selected_items", selectedItems.map(selected => selected.item));
+triggerEvent("selection_changed");
+```
+
+### 4. Error Handling Rule
+Implement silent error handling with try-catch blocks and never show raw errors to users:
+
+```javascript
+try {
+  props.instance.publishState("selected_event", event.originalData);
+} catch (error) {
+  // Silent error handling
+}
+```
+
+### 5. Performance Rule
+Use useMemo and useCallback for expensive calculations and event handlers:
+
+```javascript
+const WeekView = useMemo(() => {
+  const renderWeek = (date) => {
+    // Complex rendering logic
+  };
+  return renderWeek(currentDate);
+}, [currentDate, events, viewMode, colors, colorAccent]);
+```
+
+### 6. Styling Rule
+Use React Native StyleSheet for all styling, never inline styles:
+
+```javascript
+const styles = StyleSheet.create({
+  placeholderText: {
+    color: '#999',
+    fontSize: 16
+  },
+  container: {
+    minWidth: minElemWidth - border_width_left - border_width_right,
+    minHeight: minElemHeight - border_width_top - border_width_bottom,
+    maxWidth: maxElemWidth - border_width_left - border_width_right,
+    maxHeight: maxElemHeight - border_width_top - border_width_bottom,
+    overflow: 'hidden'
+  }
+});
+```
+
+### 7. Animation Rule
+Use React Native Animated API for all animations:
+
+```javascript
+const popupScale = eventPopupAnimation.interpolate({
+  inputRange: [0, 1],
+  outputRange: [0.8, 1]
+});
+```
+
+### 8. Data Processing Rule
+Process Bubble data sources safely with null checks and retry logic:
+
+```javascript
+const dataSource = data_source.get(0, dataLen);
+if (!isComplexAppType(data_type)) {
+  props.instance.data.dataObjects = dataSource.map((item, index) => ({
+    id: (index + 1).toString(),
+    label: item,
+    item: item
+  }));
+}
+```
+
+### 9. Responsive Design Rule
+Use Dimensions API and percentage-based layouts for responsiveness:
+
+```javascript
+const width = props.bubble?.width || Dimensions.get('window').width;
+const height = props.bubble?.height || Dimensions.get('window').height;
+```
+
+### 10. Event Handling Rule
+Always use TouchableOpacity or PanGestureHandler for touch interactions:
+
+```javascript
+<TouchableOpacity
+  ref={dropdownRef}
+  style={styles.dropdownHeader}
+  onPress={handleDropdownToggle}
+>
+```
+
+### 11. Accessibility Rule
+Include essential accessibility props like accessibilityLabel:
+
+```javascript
+<TouchableOpacity
+  accessibilityLabel="Open dropdown menu"
+  accessibilityRole="button"
+>
+```
+
+### 12. Localization Rule
+Support multiple languages through translation objects:
+
+```javascript
+const translations = {
+  English: {
+    monthNames: ['January', 'February', ...],
+    dayNames: ['Sun', 'Mon', ...]
+  },
+  French: {
+    monthNames: ['Janvier', 'Février', ...],
+    dayNames: ['Dim', 'Lun', ...]
+  }
+};
+```
+
+### 13. Cleanup Rule
+Always clean up effects, timeouts, and subscriptions:
+
+```javascript
+useEffect(() => {
+  const timer = setInterval(() => {...}, 60000);
+  return () => clearInterval(timer);
+}, []);
+```
+
+### 14. Documentation Rule
+Include clear comments explaining complex logic:
+
+```javascript
+// Helper function to check if an event spans multiple days
+const isMultiDayEvent = (event) => {
+  const startDate = new Date(event.start);
+  const endDate = new Date(event.end);
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+  return endDate.getTime() > startDate.getTime();
+};
+```
+
+### 15. Prop Validation Rule
+Validate all props with default values and type checking:
+
+```javascript
+const {
+  placeholder,
+  data_type,
+  data_source,
+  data_id_field,
+  data_label_field,
+  default_data,
+  enable_search,
+  max_displayed_items,
+  max_options_list_height,
+  selected_items_color,
+  max_selected_items
+} = props;
+```
+
+### 16. Preview Mode Rule
+Implement preview functionality for Bubble editor:
+
+```javascript
+let calendarHTML = `
+  <div style="
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: ${colors.background};
+  ">...</div>`;
+$(instance.canvas).empty().append(calendarHTML);
+```
+
+### 17. Component Structure Rule
+Component code must be wrapped within function(props) {...}. Never add function name, it must be anonymous. Do not add code.export and anything of that nature. It must always follow this exact structure function(props) {...}
+
+## 📋 Complete Code Samples
+
+### 🎯 DROPDOWN COMPONENT
+
+#### Component Code
+```javascript
+function(props) {
+  // Multi Dropdown Native -> (component) Multi Dropdown
+  const {
+    View,
+    Text,
+    TouchableOpacity,
+    ScrollView,
+    TextInput,
+    StyleSheet,
+    Modal,
+    Dimensions
+  } = props.context.libraries["react-native"];
+  const {
+    useState,
+    useRef,
+    useEffect
+  } = props.context.libraries["react"];
+  const {
+    reportDebugger
+  } = props.context;
+  const {
+    publishState,
+    triggerEvent
+  } = props.instance;
+  const {
+    placeholder,
+    data_type,
+    data_source,
+    data_id_field,
+    data_label_field,
+    default_data,
+    enable_search,
+    max_displayed_items,
+    max_options_list_height,
+    selected_items_color,
+    max_selected_items
+  } = props;
+  const {
+    width,
+    border_width_left,
+    border_width_right,
+    height,
+    border_width_top,
+    border_width_bottom
+  } = props.bubble;
+  const minElemHeight = parseInt(props.bubble.min_height_css);
+  const minElemWidth = parseInt(props.bubble.min_width_css);
+  const maxElemHeight = parseInt(props.bubble.max_height_css);
+  const maxElemWidth = parseInt(props.bubble.max_width_css);
+
+  // Skip plugin execution while data_type is not set
+  if (!data_type) return null;
+
+  // Skip plugin execution if the data_source is not set
+  const dataLen = data_source?.length();
+  if (!dataLen) {
+    return null;
+  }
+
+  // Function to determine if the data type is complex
+  function isComplexAppType(appType) {
+    return appType === 'user' || appType.includes('custom') || appType.includes('api.apiconnector2') || appType.match(/api\..*\.plugin_api/) !== null;
+  }
+
+  // Process data source based on data type
+  const dataSource = data_source.get(0, dataLen);
+  if (!isComplexAppType(data_type)) {
+    // Simple data types
+    props.instance.data.dataObjects = dataSource.map((item, index) => ({
+      id: (index + 1).toString(),
+      label: item,
+      item: item // Store the full item for later use
+    }));
+  } else {
+    // Complex data types
+    if (!data_label_field) {
+      reportDebugger("Please set 'Data label field' for complex data types.");
+      return null;
+    }
+    if (!data_id_field) {
+      // Data without ID field
+      props.instance.data.dataObjects = dataSource.map((item, index) => ({
+        id: (index + 1).toString(),
+        label: item.get(data_label_field),
+        item: item // Store the full item for later use
+      }));
+    } else {
+      // Data with ID field
+      props.instance.data.dataObjects = dataSource.map((item, index) => ({
+        id: item.get(data_id_field).toString(),
+        label: item.get(data_label_field),
+        item: item // Store the full item for later use
+      }));
+    }
+  }
+
+  // Process default data based on data type
+  const defaultDataLen = default_data?.length() || 0;
+  const defaultDataSource = default_data?.get(0, defaultDataLen);
+  props.instance.data.defaultData = [];
+  if (defaultDataLen) {
+    if (!isComplexAppType(data_type)) {
+      // Simple data types
+      defaultDataSource.forEach(item => {
+        // Find matching item in dataObjects by label
+        const matchingDataObject = props.instance.data.dataObjects.find(dataObj => dataObj.label === item);
+        if (matchingDataObject) {
+          props.instance.data.defaultData.push({
+            ...matchingDataObject
+          });
+        }
+      });
+    } else {
+      // Complex data types
+      defaultDataSource.forEach(item => {
+        let matchingDataObject;
+        if (!data_id_field) {
+          // Data without ID field - match by label
+          const defaultLabel = item.get(data_label_field);
+          matchingDataObject = props.instance.data.dataObjects.find(dataObj => dataObj.label === defaultLabel);
+        } else {
+          // Data with ID field - match by ID
+          const defaultId = item.get(data_id_field).toString();
+          const defaultLabel = item.get(data_label_field);
+          matchingDataObject = props.instance.data.dataObjects.find(dataObj => dataObj.id === defaultId && dataObj.label === defaultLabel);
+        }
+        if (matchingDataObject) {
+          props.instance.data.defaultData.push({
+            id: matchingDataObject.id,
+            label: matchingDataObject.label,
+            item: matchingDataObject.item
+          });
+        }
+      });
+    }
+  }
+
+  // Compare 2 arrays
+  function areArraysEqual(arr1, arr2) {
+    if (!Array.isArray(arr1) || !Array.isArray(arr2)) return false;
+    if (arr1.length !== arr2.length) return false;
+    const arr1String = JSON.stringify(arr1);
+    const arr2String = JSON.stringify(arr2);
+    if (arr1String !== arr2String) return false;
+    return true;
+  }
+
+  // Detect "update" function call by Bubble
+  if (areArraysEqual(props.instance.data.dataObjects, props.instance.data.previousDataObjects)) {
+    // Changes from Bubble
+  } else {
+    // Initial load or data change by user
+    props.instance.data.previousDataObjects = [...props.instance.data.dataObjects];
+    props.instance.data.selectedItems = [...props.instance.data.defaultData];
+  }
+
+  const styles = StyleSheet.create({
+    placeholderText: {
+      color: '#999',
+      fontSize: 16
+    },
+    container: {
+      minWidth: minElemWidth - border_width_left - border_width_right,
+      minHeight: minElemHeight - border_width_top - border_width_bottom,
+      maxWidth: maxElemWidth - border_width_left - border_width_right,
+      maxHeight: maxElemHeight - border_width_top - border_width_bottom,
+      overflow: 'hidden'
+    },
+    dropdownHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: '#e8e8e8',
+      paddingHorizontal: 15,
+      paddingVertical: 12,
+      minHeight: 60 - border_width_top - border_width_bottom
+    },
+    selectedContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      flexWrap: 'wrap'
+    },
+    selectedTag: {
+      backgroundColor: selected_items_color,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginRight: 8,
+      marginVertical: 2
+    },
+    selectedTagText: {
+      color: 'white',
+      fontSize: 14,
+      fontWeight: '500'
+    },
+    remainingTag: {
+      backgroundColor: selected_items_color,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8
+    },
+    remainingTagText: {
+      color: 'white',
+      fontSize: 14,
+      fontWeight: '600'
+    },
+    arrow: {
+      fontSize: 12,
+      color: '#666',
+      marginLeft: 10
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'transparent'
+    },
+    dropdownContent: {
+      position: 'absolute',
+      backgroundColor: 'white',
+      borderRadius: 8,
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 4
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 10,
+      maxHeight: max_options_list_height || 300,
+      borderWidth: 1,
+      borderColor: '#e0e0e0'
+    },
+    searchContainer: {
+      padding: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0'
+    },
+    searchInput: {
+      fontSize: 16,
+      paddingVertical: 8,
+      paddingHorizontal: 0,
+      color: '#333'
+    },
+    itemsList: {
+      maxHeight: enable_search ? max_options_list_height - 80 || 200 : max_options_list_height || 200
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 15,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f8f8f8'
+    },
+    selectedItem: {
+      backgroundColor: '#fce4ec'
+    },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: '#e8e8e8',
+      marginRight: 12,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    checkboxInner: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: 'transparent'
+    },
+    checkboxSelected: {
+      backgroundColor: selected_items_color
+    },
+    itemText: {
+      fontSize: 16,
+      color: '#333',
+      flex: 1
+    },
+    selectedItemText: {
+      color: selected_items_color,
+      fontWeight: '500'
+    }
+  });
+
+  const MultiSelectDropdown = ({
+    placeholder = "Choose a tag",
+    data = [],
+    defaultData = [],
+    enableSearch = false,
+    maxDisplayItems = 3,
+    selectedItemsLimit = undefined
+  }) => {
+    // Limit the defaultData to the selectedItemsLimit
+    if (selectedItemsLimit !== undefined && defaultData.length > selectedItemsLimit) {
+      defaultData = defaultData.slice(0, selectedItemsLimit);
+    }
+    const [isOpen, setIsOpen] = useState(false);
+    const [selectedItems, setSelectedItems] = useState(defaultData);
+    const [searchText, setSearchText] = useState('');
+    const [dropdownLayout, setDropdownLayout] = useState({
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      showAbove: false
+    });
+    const dropdownRef = useRef(null);
+    
+    useEffect(() => {
+      publishState("selected_items", selectedItems.map(selected => selected.item));
+      triggerEvent("selection_changed");
+    }, [selectedItems]);
+    
+    props.instance.data.resetSelection = function () {
+      setSelectedItems([]);
+      props.instance.data.selectedItems = [];
+      publishState("selected_items", []);
+      triggerEvent("selection_changed");
+    };
+    
+    const filteredData = data.filter(item => item?.label && item.label.toLowerCase().includes(searchText.toLowerCase()));
+    
+    const handleItemPress = item => {
+      let newSelectedItems;
+      if (selectedItems.find(selected => selected.id === item.id)) {
+        newSelectedItems = selectedItems.filter(selected => selected.id !== item.id);
+      } else {
+        if (selectedItemsLimit === undefined || selectedItems.length < selectedItemsLimit) {
+          newSelectedItems = [...selectedItems, item];
+        } else {
+          triggerEvent("limit_reached");
+          return;
+        }
+      }
+      setSelectedItems(newSelectedItems);
+      props.instance.data.selectedItems = [...newSelectedItems];
+    };
+    
+    const handleDropdownToggle = () => {
+      if (!isOpen && dropdownRef.current) {
+        dropdownRef.current.measureInWindow((x, y, width, height) => {
+          const screenHeight = Dimensions.get('window').height;
+          const dropdownHeight = Math.min(300, filteredData.length * 50 + 80);
+
+          const spaceBelow = screenHeight - (y + height);
+          const spaceAbove = y;
+
+          const showAbove = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+          setDropdownLayout({
+            x,
+            y: showAbove ? y - dropdownHeight + 17 : y + height + 5,
+            width,
+            height,
+            showAbove
+          });
+          setIsOpen(true);
+        });
+      } else {
+        setIsOpen(false);
+      }
+    };
+    
+    const renderSelectedTags = () => {
+      if (selectedItems.length === 0) return null;
+      const displayItems = selectedItems.slice(0, maxDisplayItems);
+      const remainingCount = selectedItems.length - maxDisplayItems;
+      return /*#__PURE__*/React.createElement(View, {
+        style: styles.selectedContainer
+      }, displayItems.map(item => /*#__PURE__*/React.createElement(View, {
+        key: item.id,
+        style: styles.selectedTag
+      }, /*#__PURE__*/React.createElement(Text, {
+        style: styles.selectedTagText
+      }, item.label))), remainingCount > 0 && /*#__PURE__*/React.createElement(View, {
+        style: styles.remainingTag
+      }, /*#__PURE__*/React.createElement(Text, {
+        style: styles.remainingTagText
+      }, remainingCount)));
+    };
+    
+    const renderDropdownHeader = () => /*#__PURE__*/React.createElement(TouchableOpacity, {
+      ref: dropdownRef,
+      style: styles.dropdownHeader,
+      onPress: handleDropdownToggle
+    }, selectedItems.length === 0 ? /*#__PURE__*/React.createElement(Text, {
+      style: styles.placeholderText
+    }, placeholder) : renderSelectedTags(), /*#__PURE__*/React.createElement(Text, {
+      style: [styles.arrow, {
+        transform: [{
+          rotate: isOpen ? '180deg' : '0deg'
+        }]
+      }]
+    }, "\u25BC"));
+    
+    const renderDropdownItem = item => {
+      const isSelected = selectedItems.find(selected => selected.id === item.id);
+      return /*#__PURE__*/React.createElement(TouchableOpacity, {
+        key: item.id,
+        style: [styles.dropdownItem, isSelected && styles.selectedItem],
+        onPress: () => handleItemPress(item)
+      }, /*#__PURE__*/React.createElement(View, {
+        style: styles.checkbox
+      }, /*#__PURE__*/React.createElement(View, {
+        style: [styles.checkboxInner, isSelected && styles.checkboxSelected]
+      })), /*#__PURE__*/React.createElement(Text, {
+        style: [styles.itemText, isSelected && styles.selectedItemText]
+      }, item.label));
+    };
+    
+    return /*#__PURE__*/React.createElement(View, {
+      style: styles.container
+    }, renderDropdownHeader(), /*#__PURE__*/React.createElement(Modal, {
+      visible: isOpen,
+      transparent: true,
+      animationType: "fade",
+      onRequestClose: () => setIsOpen(false)
+    }, /*#__PURE__*/React.createElement(TouchableOpacity, {
+      style: styles.modalOverlay,
+      activeOpacity: 1,
+      onPress: () => setIsOpen(false)
+    }, /*#__PURE__*/React.createElement(View, {
+      style: [styles.dropdownContent, {
+        left: dropdownLayout.x,
+        top: dropdownLayout.y,
+        width: dropdownLayout.width
+      }]
+    }, /*#__PURE__*/React.createElement(TouchableOpacity, {
+      activeOpacity: 1,
+      onPress: () => {}
+    }, enableSearch && /*#__PURE__*/React.createElement(View, {
+      style: styles.searchContainer
+    }, /*#__PURE__*/React.createElement(TextInput, {
+      style: styles.searchInput,
+      placeholder: "Search",
+      value: searchText,
+      onChangeText: setSearchText
+    })), /*#__PURE__*/React.createElement(ScrollView, {
+      style: styles.itemsList,
+      showsVerticalScrollIndicator: false
+    }, filteredData.map(item => renderDropdownItem(item))))))));
+  };
+
+  return /*#__PURE__*/React.createElement(MultiSelectDropdown, {
+    placeholder: placeholder,
+    maxDisplayItems: Math.min(Math.max(1, max_displayed_items), Infinity),
+    data: props.instance.data.dataObjects,
+    defaultData: props.instance.data.selectedItems,
+    enableSearch: enable_search,
+    selectedItemsLimit: max_selected_items ? Math.min(Math.max(1, max_selected_items), Infinity) : undefined
+  });
+}
+```
+
+#### Action Code
+```javascript
+function(instance, properties, context) {
+  // Multi Dropdown Native -> (component) Multi Dropdown -> Reset
+  const { resetSelection } = instance.data;
+
+  if (resetSelection) {
+    // Reset the selection of the multi dropdown
+    resetSelection();
+  }
+}
+```
+
+#### Preview Code
+```javascript
+function(instance, properties) {
+  // Default properties with fallbacks
+  const colorMode = properties.color_mode || 'Dark';
+  const colorAccent = properties.color_accent || '#3b82f6';
+  const language = properties.language || 'English';
+  
+  // Color scheme based on mode
+  const colors = colorMode === 'Light' ? {
+    background: '#ffffff',
+    surface: '#f8fafc',
+    border: '#e2e8f0',
+    text: '#1e293b',
+    textSecondary: '#64748b'
+  } : {
+    background: '#111827',
+    surface: '#1f2937',
+    border: '#374151',
+    text: '#ffffff',
+    textSecondary: '#d1d5db'
+  };
+
+  // Sample events data
+  const events = [
+    {
+      title: 'Meeting with Client',
+      start: new Date(2025, 5, 18, 10, 0), // June 18, 2025 10:00 AM
+      end: new Date(2025, 5, 18, 11, 30),  // June 18, 2025 11:30 AM
+      color: '#22c55e'
+    },
+    {
+      title: 'Conference',
+      start: new Date(2025, 5, 18, 9, 0),  // June 18, 2025 09:00 AM
+      end: new Date(2025, 5, 19, 17, 0),   // June 19, 2025 5:00 PM
+      color: '#8b5cf6'
+    },
+    {
+      title: 'Meetup',
+      start: new Date(2025, 5, 18),        // June 18, 2025
+      end: new Date(2025, 5, 18),          // June 18, 2025
+      color: '#06b6d4',
+      allDay: true
+    },
+    {
+      title: 'Launch',
+      start: new Date(2025, 5, 20, 14, 0), // June 20, 2025 2:00 PM
+      end: new Date(2025, 5, 20, 16, 0),   // June 20, 2025 4:00 PM
+      color: '#ef4444'
+    }
+  ];
+
+  // Helper function to format time
+  const formatTime = (date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  };
+
+  // Translation system
+  const translations = {
+    English: {
+      monthNames: [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ],
+      dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    },
+    French: {
+      monthNames: [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      ],
+      dayNames: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+    },
+    Spanish: {
+      monthNames: [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ],
+      dayNames: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+    }
+  };
+
+  // Get current language translations with fallback to English
+  const t = translations[language] || translations.English;
+
+  // Generate calendar grid HTML
+  let calendarHTML = `
+    <div style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: ${colors.background};
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: 'Mulish', sans-serif;
+    ">
+      <!-- Header -->
+      <div style="
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      ">
+        <div style="
+          color: ${colors.text};
+          font-size: 16px;
+          font-weight: 600;
+        ">${t.monthNames[5]} 2025</div>
+        <div style="display: flex; gap: 8px;">
+          <div style="
+            padding: 4px 12px;
+            background: ${colorAccent};
+            border-radius: 6px;
+            color: ${colors.text};
+            font-size: 14px;
+          ">M</div>
+        </div>
+      </div>
+
+      <!-- Days header -->
+      <div style="
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        padding: 8px 0;
+        background: ${colors.surface};
+        flex-shrink: 0;
+      ">
+        ${t.dayNames.map(day => `
+          <div style="
+            color: ${colors.textSecondary};
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+          ">${day}</div>
+        `).join('')}
+      </div>
+
+      <!-- Calendar grid -->
+      <div style="
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        grid-template-rows: repeat(6, 1fr);
+        background: ${colors.background};
+        min-height: 0;
+      ">
+        ${Array.from({ length: 42 }, (_, i) => {
+          const date = i + 1;
+          const hasEvents = date === 18 || date === 19 || date === 20;
+          const dayEvents = events.filter(event => event.start.getDate() === date);
+          
+          return `
+            <div style="
+              background: ${colors.background};
+              border-top: 1px solid ${colors.border};
+              border-left: ${i % 7 === 0 ? '0' : `1px solid ${colors.border}`};
+              padding: 4px;
+              display: flex;
+              flex-direction: column;
+              gap: 2px;
+              min-width: 0;
+              min-height: 0;
+              overflow: hidden;
+            ">
+              <div style="
+                color: ${colors.text};
+                font-size: 14px;
+                text-align: center;
+                padding: 2px;
+                ${date === 18 ? `font-weight: bold; color: ${colorAccent};` : ''}
+              ">${date}</div>
+              ${dayEvents.map(event => `
+                <div style="
+                  background: ${event.color};
+                  border-radius: 4px;
+                  padding: 2px 4px;
+                  margin: 1px 0;
+                  overflow: hidden;
+                  ${event.allDay ? 'border-left: 3px solid #ffffff;' : ''}
+                ">
+                  <div style="
+                    color: #ffffff;
+                    font-size: 10px;
+                    font-weight: 500;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                  ">${event.title}</div>
+                  ${!event.allDay ? `
+                    <div style="
+                      color: #ffffff;
+                      font-size: 9px;
+                      opacity: 0.9;
+                    ">${formatTime(event.start)}</div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
+  // Clear the instance canvas before appending
+  $(instance.canvas).empty().append(calendarHTML);
+}
+```
+
+### 📅 CALENDAR COMPONENT
+
+#### Component Code
+```javascript
+function(props) {
+  // Access React and React Native from context
+  const React = props.context?.libraries?.['react'];
+  if (!React) return null;
+
+  const { useState, useEffect, useMemo, useRef, useCallback } = React;
+  const { View, Text, TouchableOpacity, ScrollView, Dimensions, Animated, BackHandler } = props.context.libraries['react-native'];
+  const { Svg, Circle, Path } = props.context.libraries['react-native-svg'];
+  const { PanGestureHandler, State } = props.context.libraries['react-native-gesture-handler'];
+
+  // Generate unique instance ID
+  let instanceId = (Math.random() * Math.pow(2, 54)).toString(36);
+  props.instance.data.instanceName = 'calendar-' + instanceId;
+
+  // Register this calendar instance globally for jump-to functionality
+  if (typeof global !== 'undefined') {
+    if (!global.calendarInstances) {
+      global.calendarInstances = {};
+    }
+    global.calendarInstances[instanceId] = {};
+  }
+
+  // Define all props at the beginning
+  const dataSource = props.data_source;
+  const titleField = props.title || 'title';
+  const dateStartField = props.date_start || 'date_start';
+  const dateEndField = props.date_end || 'date_end';
+  const allDayField = props.all_day || 'all_day';
+  const colorEvent = props.color_event || '';
+  const colorAccent = props.color_accent || '#3b82f6';
+  const colorMode = props.color_mode || 'Dark';
+  const language = props.language || 'English';
+
+  // Translation system
+  const translations = {
+    English: {
+      monthNames: [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ],
+      dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      dayNamesFull: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      allDay: 'All Day',
+      loading: 'Loading...',
+      month: 'M',
+      week: 'W',
+      day: 'D',
+      am: 'AM',
+      pm: 'PM'
+    },
+    French: {
+      monthNames: [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      ],
+      dayNames: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
+      dayNamesFull: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
+      allDay: 'Toute la journée',
+      loading: 'Chargement...',
+      month: 'M',
+      week: 'S',
+      day: 'J',
+      am: 'AM',
+      pm: 'PM'
+    },
+    Spanish: {
+      monthNames: [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ],
+      dayNames: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+      dayNamesFull: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+      allDay: 'Todo el día',
+      loading: 'Cargando...',
+      month: 'M',
+      week: 'S',
+      day: 'D',
+      am: 'AM',
+      pm: 'PM'
+    }
+  };
+
+  // Get current language translations
+  const t = translations[language] || translations.English;
+
+  // Get responsive dimensions
+  const width = props.bubble?.width || Dimensions.get('window').width;
+  const height = props.bubble?.height || Dimensions.get('window').height;
+
+  // Calendar state
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState('month'); // 'month', 'week', 'day'
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [showMonthSelector, setShowMonthSelector] = useState(false);
+  const [showYearSelector, setShowYearSelector] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [forceRenderCount, setForceRenderCount] = useState(0);
+  const [isReactNativeInitialized, setIsReactNativeInitialized] = useState(false);
+  const eventPopupAnimation = useRef(new Animated.Value(0)).current;
+  
+  // Animation values
+  const swipeAnimation = useRef(new Animated.Value(0)).current;
+
+  // [Rest of the calendar component code continues with all the functions and components...]
+  
+  return React.createElement(View, {
+    style: {
+      width: width,
+      height: height,
+      backgroundColor: colors.background,
+      fontFamily: 'inherit',
+      fontWeight: 'inherit',
+      color: 'inherit'
+    }
+  }, [
+    React.createElement(Header, { key: 'header' }),
+    React.createElement(MonthSelector, { key: 'month-selector' }),
+    React.createElement(YearSelector, { key: 'year-selector' }),
+    renderCurrentView(),
+    React.createElement(FloatingActionButton, { key: 'fab' }),
+    React.createElement(EventPopup, { key: 'event-popup' })
+  ]);
+}
+```
+
+#### Action Code
+```javascript
+function(instance, properties, context) {
+    // Extract date property - can be Date object, string, or timestamp
+    const targetDate = properties.date || properties.target_date || new Date();
+    
+    // Convert to proper Date object if needed
+    let dateToJump;
+    try {
+        if (targetDate instanceof Date) {
+            dateToJump = new Date(targetDate);
+        } else if (typeof targetDate === 'string' || typeof targetDate === 'number') {
+            dateToJump = new Date(targetDate);
+        } else {
+            dateToJump = new Date(); // fallback to today
+        }
+        
+        // Validate the date
+        if (isNaN(dateToJump.getTime())) {
+            dateToJump = new Date(); // fallback to today
+        }
+        
+        // Format date for display
+        const formattedDate = dateToJump.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        
+        // Try to use instance methods first
+        try {
+            if (instance?.data?.jumpToDate) {
+                instance.data.jumpToDate(dateToJump);
+            } else if (instance?.data?.jumpTo) {
+                instance.data.jumpTo(dateToJump);
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+        
+    } catch (error) {
+        // Silent error handling
+    }
+}
+```
+
+#### Preview Code
+```javascript
+function(instance, properties) {
+  // Default properties with fallbacks
+  const colorMode = properties.color_mode || 'Dark';
+  const colorAccent = properties.color_accent || '#3b82f6';
+  const language = properties.language || 'English';
+  
+  // Color scheme based on mode
+  const colors = colorMode === 'Light' ? {
+    background: '#ffffff',
+    surface: '#f8fafc',
+    border: '#e2e8f0',
+    text: '#1e293b',
+    textSecondary: '#64748b'
+  } : {
+    background: '#111827',
+    surface: '#1f2937',
+    border: '#374151',
+    text: '#ffffff',
+    textSecondary: '#d1d5db'
+  };
+
+  // Sample events data
+  const events = [
+    {
+      title: 'Meeting with Client',
+      start: new Date(2025, 5, 18, 10, 0),
+      end: new Date(2025, 5, 18, 11, 30),
+      color: '#22c55e'
+    },
+    {
+      title: 'Conference',
+      start: new Date(2025, 5, 18, 9, 0),
+      end: new Date(2025, 5, 19, 17, 0),
+      color: '#8b5cf6'
+    },
+    {
+      title: 'Meetup',
+      start: new Date(2025, 5, 18),
+      end: new Date(2025, 5, 18),
+      color: '#06b6d4',
+      allDay: true
+    },
+    {
+      title: 'Launch',
+      start: new Date(2025, 5, 20, 14, 0),
+      end: new Date(2025, 5, 20, 16, 0),
+      color: '#ef4444'
+    }
+  ];
+
+  // Helper function to format time
+  const formatTime = (date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  };
+
+  // Translation system
+  const translations = {
+    English: {
+      monthNames: [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ],
+      dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    },
+    French: {
+      monthNames: [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      ],
+      dayNames: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+    },
+    Spanish: {
+      monthNames: [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ],
+      dayNames: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+    }
+  };
+
+  // Get current language translations with fallback to English
+  const t = translations[language] || translations.English;
+
+  // Generate calendar grid HTML
+  let calendarHTML = `
+    <div style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: ${colors.background};
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: 'Mulish', sans-serif;
+    ">
+      <!-- Header -->
+      <div style="
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      ">
+        <div style="
+          color: ${colors.text};
+          font-size: 16px;
+          font-weight: 600;
+        ">${t.monthNames[5]} 2025</div>
+        <div style="display: flex; gap: 8px;">
+          <div style="
+            padding: 4px 12px;
+            background: ${colorAccent};
+            border-radius: 6px;
+            color: ${colors.text};
+            font-size: 14px;
+          ">M</div>
+        </div>
+      </div>
+
+      <!-- Days header -->
+      <div style="
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        padding: 8px 0;
+        background: ${colors.surface};
+        flex-shrink: 0;
+      ">
+        ${t.dayNames.map(day => `
+          <div style="
+            color: ${colors.textSecondary};
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+          ">${day}</div>
+        `).join('')}
+      </div>
+
+      <!-- Calendar grid -->
+      <div style="
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        grid-template-rows: repeat(6, 1fr);
+        background: ${colors.background};
+        min-height: 0;
+      ">
+        ${Array.from({ length: 42 }, (_, i) => {
+          const date = i + 1;
+          const dayEvents = events.filter(event => event.start.getDate() === date);
+          
+          return `
+            <div style="
+              background: ${colors.background};
+              border-top: 1px solid ${colors.border};
+              border-left: ${i % 7 === 0 ? '0' : `1px solid ${colors.border}`};
+              padding: 4px;
+              display: flex;
+              flex-direction: column;
+              gap: 2px;
+              min-width: 0;
+              min-height: 0;
+              overflow: hidden;
+            ">
+              <div style="
+                color: ${colors.text};
+                font-size: 14px;
+                text-align: center;
+                padding: 2px;
+                ${date === 18 ? `font-weight: bold; color: ${colorAccent};` : ''}
+              ">${date}</div>
+              ${dayEvents.map(event => `
+                <div style="
+                  background: ${event.color};
+                  border-radius: 4px;
+                  padding: 2px 4px;
+                  margin: 1px 0;
+                  overflow: hidden;
+                  ${event.allDay ? 'border-left: 3px solid #ffffff;' : ''}
+                ">
+                  <div style="
+                    color: #ffffff;
+                    font-size: 10px;
+                    font-weight: 500;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                  ">${event.title}</div>
+                  ${!event.allDay ? `
+                    <div style="
+                      color: #ffffff;
+                      font-size: 9px;
+                      opacity: 0.9;
+                    ">${formatTime(event.start)}</div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
+  // Clear the instance canvas before appending
+  $(instance.canvas).empty().append(calendarHTML);
+}
+```
+
+## 📚 Complete Available Libraries
+
+```javascript
+{
+    "@bbob/preset-react": "^4.2.0",
+    "@bbob/react": "^4.2.0",
+    "@expo/metro-runtime": "~4.0.1",
+    "@gorhom/bottom-sheet": "^5.1.2",
+    "@gorhom/portal": "^1.0.14",
+    "@microsoft/react-native-clarity": "^4.2.2",
+    "@react-native-community/audio-toolkit": "^2.0.3",
+    "@react-native-community/datetimepicker": "^8.2.0",
+    "@react-native-community/netinfo": "11.4.1",
+    "@react-navigation/bottom-tabs": "^7.2.0",
+    "@react-navigation/elements": "^2.2.5",
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/native-stack": "^7.2.0",
+    "@sentry/react-native": "^6.10.0",
+    "@shopify/flash-list": "1.7.3",
+    "expo": "~52.0.42",
+    "expo-asset": "^11.0.4",
+    "expo-auth-session": "~6.0.2",
+    "expo-blur": "~14.0.3",
+    "expo-clipboard": "~7.0.1",
+    "expo-constants": "^17.0.7",
+    "expo-crypto": "~14.0.2",
+    "expo-document-picker": "~13.0.3",
+    "expo-image": "~2.0.7",
+    "expo-image-picker": "^16.0.6",
+    "expo-linear-gradient": "~14.0.2",
+    "expo-location": "~18.0.9",
+    "expo-media-library": "^17.0.6",
+    "expo-notifications": "~0.29.14",
+    "expo-secure-store": "~14.0.1",
+    "expo-splash-screen": "^0.29.22",
+    "expo-status-bar": "~2.0.1",
+    "expo-updates": "~0.27.4",
+    "expo-video": "~2.0.6",
+    "fast-text-encoding": "^1.0.6",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native": "~0.77.1",
+    "react-native-fs": "^2.20.0",
+    "react-native-gesture-handler": "~2.22.0",
+    "react-native-localize": "^3.4.1",
+    "react-native-maps": "1.18.0",
+    "react-native-mmkv": "^2.12.2",
+    "react-native-modal-datetime-picker": "^18.0.0",
+    "react-native-reanimated": "~3.17.5",
+    "react-native-redash": "^18.1.1",
+    "react-native-safe-area-context": "~5.1.0",
+    "react-native-screens": "~4.8.0",
+    "react-native-svg": "^15.11.2",
+    "react-native-web": "~0.19.13",
+    "react-native-webview": "~13.13.1"
+}
+```
+
+### Other Available Libraries
+- expo-video
+- react-native-community/audio-toolkit
+- @microsoft/react-native-clarity
+- expo-clipboard
+- expo-document-picker
+
+## 🖼️ Small Display Icon Template
+
+```javascript
+function(instance, properties) {
+    $(instance.canvas).append(`<div style="background-color: #E7E9EB; margin: 0; padding: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;"><img src="👇🏽" style="width: 20px; height: 20px; margin: 0; padding: 0;"></div>`)
+}
+```
+
+## 📄 Plugin Description Template
+
+Must be concise, no subpoints, related emoji before every point, marketable tone, must contain "native mobile", and include placeholders:
+
+```
+Converts timestamps into human-readable relative time formats with full language customization. For native mobile.
+
+Features
+
+🕐 Real-time updates - Automatically refreshes at configurable intervals.
+  
+🌍 Multi-language support - Fully customizable text for any language.
+  
+📊 Smart time ranges - Shows seconds, minutes, hours, yesterday, last [day], or dates. 
+ 
+🔢 Intelligent pluralization - Automatically handles singular/plural forms.
+ 
+🎛️ Flexible suffix control - Toggle "ago" suffix on/off.
+
+Preview:
+
+Editor:
+
+Service link:
+```
+
+## ✅ Development Checklist
+
+### Structure Requirements
+- [ ] Anonymous function wrapper `function(props) {...}`
+- [ ] Props extraction → State → Helper functions → Effects → Styles → Components → Main render
+- [ ] Library imports from context only
+- [ ] No external dependencies
+
+### Responsiveness Requirements  
+- [ ] Flex properties used everywhere
+- [ ] Dimensions API for screen size
+- [ ] Percentage-based layouts
+- [ ] Min/max width/height handling from props.bubble
+
+### Performance Requirements
+- [ ] useMemo for expensive calculations
+- [ ] useCallback for event handlers
+- [ ] Silent error handling with try-catch
+- [ ] Cleanup in useEffect
+
+### Bubble Integration Requirements
+- [ ] publishState for state changes
+- [ ] triggerEvent for user interactions
+- [ ] Access props through props parameter
+- [ ] Handle instance.data for component methods
+
+### Styling Requirements
+- [ ] StyleSheet.create (never inline)
+- [ ] Color scheme support
+- [ ] Border width handling from props.bubble
+- [ ] Consistent spacing and typography
+
+### Data Handling Requirements
+- [ ] Null checks and validation
+- [ ] Retry logic for data loading
+- [ ] Complex vs simple data type handling
+- [ ] Default values for all props
+
+### Accessibility Requirements
+- [ ] accessibilityLabel on interactive elements
+- [ ] accessibilityRole specified
+- [ ] Proper touch targets (minimum 44px)
+
+This comprehensive guide now includes ALL the details from the original document, properly organized and structured for easy reference during Bubble React Native plugin development.---
+description:
+globs:
+alwaysApply: true
+---
