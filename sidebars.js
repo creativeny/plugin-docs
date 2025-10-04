@@ -33,6 +33,7 @@ const sidebars = {
     'dropdown',
     'html-element',
     'lottie',
+    'math-executor',
     'media-duration',
     'multi-file-uploader',
     'native-share',
